@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: environment-setup-pipeline
+message: |-
+  A Jenkins server must be instantiated in this project to manage
+  the Pipeline BuildConfig created by this template.  You will be able to log in to
+  it using your OpenShift user credentials.
+metadata:
+  annotations:
+    openshift.io/display-name: Environment Setup
+    description: |-
+      This pipeline utilizes Jenkins in Openshift to deploy CI/CD applications in your Tools Namespace
+    iconClass: icon-jenkins
+    tags: instant-app,jenkins
+  name: pipeline-build-template
+parameters:
+- description: The OpenShift Namespace prefix where the ImageStreams reside.
+  displayName: Namespace Prefix (Prefix for each namespace ie prefix-tools, prefix-dev etc)
+  name: namespacePrefix
+  required: true
+  value:
+- description: "Environment: Dev, Test, Prod or Tools"
+  displayName: Environment
+  value: tools
+  required: true
+  name: environment
+- description: True or False
+  displayName: "Deploy SonarQube"
+  value: false
+  required: true
+  name: sonarQube
+
+
+objects:
+- kind: "BuildConfig"
+  apiVersion: "v1"
+  metadata:
+    name: environment-setup-pipeline
+  spec:
+    strategy:
+      jenkinsPipelineStrategy:
+        jenkinsfile: |-
+          try {
+            
+          } catch (err) {
+             
+          }
+
+      type: JenkinsPipeline
