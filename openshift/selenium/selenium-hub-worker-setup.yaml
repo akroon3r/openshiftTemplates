@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: selenium-build-pipeline
+message: |-
+  Set up a selenium hub and preferred node of choice for testing.
+  Requires a working Jenkins instance in your Openshift Tools Namespace
+  prior to creating these services.
+metadata:
+  annotations:
+    openshift.io/display-name: Selenium Hub/Worker Template
+    description: |-
+      Create a Selenium hub and worker (chrome or firefox) to handle automation
+      of frontend testing via ci/cd pipelines
+    iconClass: icon-jenkins
+    tags: instant-app,jenkins
+  name: pipeline-build-template
+parameters:
+- description: The OpenShift Namespace prefix.
+  displayName: Namespace Prefix (Prefix for each namespace ie prefix-tools, prefix-dev etc)
+  name: namespacePrefix
+  required: true
+- description: The OpenShift Namespace.
+  displayName: Namespace (ie// tools, dev, test, prod)
+  name: namespace
+  required: true
+- description: Selenium Node Worker (ie// chrome OR firefox)
+  displayName: Selenium Node
+  name: seleniumNode
+  required: true
+  value: 'chrome'
+
+
+objects:
+- kind: "BuildConfig"
+  apiVersion: "v1"
+  metadata:
+    name: selenium-hub-node-setup-pipeline
+  spec:
+    strategy:
+      jenkinsPipelineStrategy:
+        jenkinsfile: |-
+          try {
+            node(){
+              stage('Checkout Selenium Github') {
+                dir('selenium'){
+                  git url: "https://github.com/akroon3r/selenium-openshift-templates"
+                }
+              }
+              stage('Create Seleinum Hub'){
+                dir('selenium'){
+                  sh '''
+                      pwd
+                      ls -al
+                    '''
+                  openshift.withCluster() {
+                    openshift.withProject() {
+                      sh 'oc create -f selenium-hub.yaml -n ${namespacePrefix}-${namespace}'
+                    }
+                  }
+                  
+                }
+              }
+            }
+            
+          } catch (err) {
+            echo "in catch block"
+            currentBuild.result = 'FAILURE'
+            env.ERR = "${err}"
+            echo "Caught: ${err}"
+            throw err
+          }
+
+      type: JenkinsPipeline

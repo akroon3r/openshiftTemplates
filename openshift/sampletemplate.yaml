@@ -32,7 +32,14 @@ objects:
           try {
             
           } catch (err) {
-             
+            echo "in catch block"
+            currentBuild.result = 'FAILURE'
+            env.ERR = "${err}"
+            node {
+              sh "curl -XPOST '${LIFECYCLE_WEBHOOK}' -H 'Content-type: application/json' --data '{\"username\":\"The Pipe Lion\",\"icon_emoji\":\":lion_face:\",\"text\": \"${APP_NAME} Pipeline Failure - ${ERR}\"}'"
+            }
+            echo "Caught: ${err}"
+            throw err
           }
 
       type: JenkinsPipeline
