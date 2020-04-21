@@ -55,7 +55,8 @@ objects:
                     '''
                   openshift.withCluster() {
                     openshift.withProject() {
-                      sh 'oc create -f selenium-hub.yaml -n ${namespacePrefix}-${namespace}'
+                      // Trigger deploy config here
+                      
                     }
                   }
                   
