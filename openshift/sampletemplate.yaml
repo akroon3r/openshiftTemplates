@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: CHANGE LATER
+message: |-
+  Create message here
+metadata:
+  annotations:
+    openshift.io/display-name: CHANGE LATER
+    description: |-
+      CHANGE LATER
+    iconClass: icon-jenkins
+    tags: instant-app,jenkins
+  name: pipeline-build-template
+parameters:
+- description: Sample - change later
+  displayName: Sample - change later
+  name: Sample - change later
+  required: Sample - change later
+  value: Sample - change later
+
+
+objects:
+- kind: "BuildConfig"
+  apiVersion: "v1"
+  metadata:
+    name: environment-setup-pipeline
+  spec:
+    strategy:
+      jenkinsPipelineStrategy:
+        jenkinsfile: |-
+          try {
+            
+          } catch (err) {
+             
+          }
+
+      type: JenkinsPipeline
