@@ -63,7 +63,7 @@ objects:
                   dir('selenium'){
                     openshift.withCluster(){
                       openshift.withProject(){
-                        if( "chrome" == "chrome" ) {
+                        if( "${SELENIUM_NODE}" == "chrome" ) {
                           sh 'echo Creating Chrome Node Imagestream'
                           processApply("selenium-node-chrome-imagestream.yaml", "frjeow-tools", "chrome")
                           sh 'echo Creating Chrome Node Build Config'
@@ -73,7 +73,7 @@ objects:
                           sh 'echo Creating Chrome Node Service'
                           processApply("selenium-node-chrome-service.yaml", "frjeow-tools", "chrome") 
                         }
-                        else if( "chrome" == "firefox" ){
+                        else if( "${SELENIUM_NODE}" == "firefox" ){
                           sh 'echo Creating Firefox Node Imagestream'
                           processApply("selenium-node-firefox-imagestream.yaml", "frjeow-tools", "firefox")
                           sh 'echo Creating Firefox Node Build Config'
