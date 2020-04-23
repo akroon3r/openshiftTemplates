@@ -16,12 +16,8 @@ metadata:
     tags: instant-app,jenkins
   name: pipeline-build-template
 parameters:
-- description: The OpenShift Namespace prefix.
-  displayName: Namespace Prefix (Prefix for each namespace ie prefix-tools, prefix-dev etc)
-  name: namespacePrefix
-  required: true
-- description: The OpenShift Namespace.
-  displayName: Namespace (ie// tools, dev, test, prod)
+- description: The OpenShift Namespace WITH prefix
+  displayName: Namespace (ie// pjztlm-tools)
   name: namespace
   required: true
 - description: Selenium Node Worker (ie// chrome OR firefox)
@@ -29,8 +25,6 @@ parameters:
   name: seleniumNode
   required: true
   value: 'chrome'
-
-
 objects:
 - kind: "BuildConfig"
   apiVersion: "v1"
@@ -39,31 +33,61 @@ objects:
   spec:
     strategy:
       jenkinsPipelineStrategy:
+        env: 
+        - name: SELENIUM_NODE
+          value: "${seleniumNode}"
         jenkinsfile: |-
           try {
-            node(){
-              stage('Checkout Selenium Github') {
-                dir('selenium'){
-                  git url: "https://github.com/akroon3r/selenium-openshift-templates"
+              node(){
+                stage('Checkout Selenium Github') {
+                  dir('selenium'){
+                    git url: "https://github.com/akroon3r/selenium-openshift-templates"
+                  }
                 }
-              }
-              stage('Create Seleinum Hub'){
-                dir('selenium'){
-                  sh '''
-                      pwd
-                      ls -al
-                    '''
-                  openshift.withCluster() {
-                    openshift.withProject() {
-                      // Trigger deploy config here
-                      
+                stage('Create Seleinum Hub'){
+                  dir('selenium'){
+                    openshift.withCluster() {
+                      openshift.withProject() {
+                        // Trigger deploy config here
+                        sh  'echo Deploying Hub'
+                        processApply("selenium-hub-dc.yaml", "frjeow-tools", "hub")
+                        sh 'echo Creating Hub Route'
+                        processApply("selenium-hub-service.yaml", "frjeow-tools", "hub")
+                        sh 'echo Creating Hub Service'
+                        processApply("selenium-hub-route.yaml", "frjeow-tools", "hub")
+                      }
                     }
                   }
-                  
+                }
+                stage('Deploy chosen worker node'){
+                  dir('selenium'){
+                    openshift.withCluster(){
+                      openshift.withProject(){
+                        if( "chrome" == "chrome" ) {
+                          sh 'echo Creating Chrome Node Imagestream'
+                          processApply("selenium-node-chrome-imagestream.yaml", "frjeow-tools", "chrome")
+                          sh 'echo Creating Chrome Node Build Config'
+                          processApply("selenium-node-chrome-bc.yaml", "frjeow-tools", "chrome")
+                          sh 'echo Deploying Chrome Node'
+                          processApply("selenium-node-chrome-dc.yaml", "frjeow-tools", "chrome")
+                          sh 'echo Creating Chrome Node Service'
+                          processApply("selenium-node-chrome-service.yaml", "frjeow-tools", "chrome") 
+                        }
+                        else if( "chrome" == "firefox" ){
+                          sh 'echo Creating Firefox Node Imagestream'
+                          processApply("selenium-node-firefox-imagestream.yaml", "frjeow-tools", "firefox")
+                          sh 'echo Creating Firefox Node Build Config'
+                          processApply("selenium-node-firefox-bc.yaml", "frjeow-tools", "firefox")
+                          sh 'echo Deploying Firefox Node'
+                          processApply("selenium-node-firefox-dc.yaml", "frjeow-tools", "firefox")
+                          sh 'echo Creating Firefox Node Service'
+                          processApply("selenium-node-firefox-service.yaml", "frjeow-tools", "firefox") 
+                        }
+                      }
+                    }
+                  }
                 }
               }
-            }
-            
           } catch (err) {
             echo "in catch block"
             currentBuild.result = 'FAILURE'
@@ -72,4 +96,27 @@ objects:
             throw err
           }
 
+          def processApply(String targetFile, String namespace, String worker) {
+            if ( "${worker}" == 'chrome') {
+              sh  """
+                  cd selenium-node-chrome-components
+                  oc process -f '${targetFile}' | 
+                  oc apply -f - -n '${namespace}'
+                  """
+            }
+            else if ( "${worker}" == 'firefox') {
+              sh  """
+                  cd selenium-node-firefox-components
+                  oc process -f '${targetFile}' | 
+                  oc apply -f - -n '${namespace}'
+                  """
+            }
+            else if ( "${worker}" == 'hub') {
+              sh  """
+                  cd selenium-hub-components
+                  oc process -f '${targetFile}' | 
+                  oc apply -f - -n '${namespace}'
+                  """
+            }
+          }
       type: JenkinsPipeline
