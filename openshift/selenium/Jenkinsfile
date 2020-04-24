@@ -1,0 +1,24 @@
+// Start Protractor testing
+    stage("Run Protractor Tests") {
+        def GIT_SOURCE_URL = "${YOUR_PROJECT_GIT_URL}"
+        def GIT_SOURCE_REF = "${BRANCH_OF_CHOICE}"
+        def GIT_CONTEXT_DIRECTORY = "${PATH_TO_TARGET_DIR}"
+        // checkout your repo
+        git url: "${GIT_SOURCE_URL}", branch: "${GIT_SOURCE_REF}"
+        
+        /* withCredentials works in tandem with the jenkins Openshift Sync plugin
+        create a secret containing key values of 'username' and 'password'
+        they can be referenced by whatever name you choose after usernameVariable and passwordVariable*/
+
+        withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: '${your-project-namespace}-${name-of-secret}', usernameVariable: '${CHOOSE_VARIABLE_NAME}', passwordVariable: '${CHOOSE_VARIABLE_NAME}']]) {
+            /*run whatever necessary npm command you need to prior to running your test
+            pass necessary environment variables prior to npm run in the form of ENV_VAR=${VALUE}
+            example: BCSERVICES_CARD_SERIAL_NUMBER=${SERIAL_NUMBER}*/
+
+            sh  '''
+                cd '${GIT_CONTEXT_DIRECTORY}'
+                npm install
+                npm run ${NAME_OF_TEST_SUITE}
+                '''     
+        }
+    }
