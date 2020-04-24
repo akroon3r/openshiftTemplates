@@ -1,0 +1,18 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: ${YOUR_JOB_NAME}
+spec:
+  schedule: "*/1 * * * *"  
+  jobTemplate:             
+    spec:
+      template:
+        metadata:
+          labels:          
+            parent: "cronjobpi"
+        spec:
+          containers:
+          - name: ${YOUR_JOB_NAME}
+            image: rhel7
+            command: ["curl" "${YOUR_URL}"]
+          restartPolicy: OnFailure
