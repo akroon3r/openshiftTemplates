@@ -26,12 +26,12 @@ parameters:
     value: .
     required: true
   - name: BUILT_IMAGE
-    description: Name of the built image
+    description: Name of the built react image
     displayName: Built Image
     value: react-web-app-builder
     required: false
   - name: DEPLOY_IMAGE
-    description: Name of the deployment image
+    description: Name of the nginx deployment image
     displayName: Deployed Image
     value: static-web-app-running-on-nginx
     required: false
