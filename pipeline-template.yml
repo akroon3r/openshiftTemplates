@@ -1,0 +1,216 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: ci-cd-pipeline-template
+metadata:
+  name: ci-cd-pipeline-template
+  annotations:
+    description: Template for Basic Jenkins Deployment
+    tags: jenkins
+objects:
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      application: ${APP_NAME}
+      template: ${APP_NAME}-pipeline-template
+    name: ${APP_NAME}-pipeline
+    namespace: ${LICENSE_PLATE}-tools
+  spec:
+    failedBuildsHistoryLimit: 5
+    nodeSelector: {}
+    output: {}
+    postCommit: {}
+    resources: {}
+    runPolicy: Serial
+    source:
+      contextDir: src/backend
+      git:
+        ref: master
+        uri: ${GIT_URL}
+      type: Git
+    strategy:
+      jenkinsPipelineStrategy:
+        env:
+          - name: APP_NAME
+            value: ${APP_NAME}
+          - name: LIFECYCLE_WEBHOOK
+          - name: GIT_SOURCE_URL
+            value: ${GIT_URL}
+          - name: GIT_SOURCE_REF
+            value: master
+          - name: GIT_CREDENTIALS_ID
+            value: cjpybwYjEBI8vN2lYGAhYmywnpjFqANRRJarS5yf
+          - name: GIT_CONTEXT_DIR
+            value: src/backend
+          - name: JENKINS_POD
+            value: maven
+          - name: TOOLS_NAMESPACE
+            value: ${LICENSE_PLATE}-tools
+          - name: DEV_NAMESPACE
+            value: ${LICENSE_PLATE}-dev
+          - name: TEST_NAMESPACE
+            value: ${LICENSE_PLATE}-test
+          - name: PROD_NAMESPACE
+            value: ${LICENSE_PLATE}-prod
+        jenkinsfile: >
+          try {
+              node("${JENKINS_POD}") {
+              
+                  parameters {
+                      string(name: 'git_tag', defaultValue: null)
+                  }
+              
+                  // Git Tag
+                  stage ("Get GIT Tag if present") {
+                      openshift.withCluster() {
+                          openshift.withProject() {
+                              git url: ${GIT_URL}
+                              env.git_tag = gitTagName()
+                              echo "${env.git_tag}"
+                  
+                          }
+                      }  
+                  }
+
+                  // Build Image
+                  stage("Build ${APP_NAME}") {
+                      openshift.withCluster() {
+                          openshift.withProject() {
+                              sh 'oc start-build ${APP_NAME} -n ${TOOLS_NAMESPACE} --wait' 
+                              if (env.git_tag != null) {
+                                  echo "${env.git_tag}"
+                                  sh "oc tag ${APP_NAME}:latest ${APP_NAME}:${env.git_tag}"
+                              }
+                          }
+                      }
+                  }
+
+                  // Tag Image for Dev
+                  stage('Promote to DEV') {
+                      openshift.withCluster() {
+                          openshift.withProject(){
+                              sh "echo Tagging image for DEV"
+                              sh 'oc tag ${APP_NAME}:latest ${APP_NAME}:dev'
+
+                          }
+                      }
+                  }
+
+                  stage("Deploy to DEV") {
+                      openshift.withCluster() {
+                          openshift.withProject() {
+                              sh 'echo Wait for Demo app to rollout completely.'
+                              sh 'oc rollout status -n ${DEV_NAMESPACE} dc/${APP_NAME} --watch'
+                          }
+                      }
+                  }
+                  
+                  // Tag Image for Test
+                  stage('Promote to TEST') {
+                      timeout(time: 10, unit: 'MINUTES') {
+                          script {
+                              input message: 'Promote application to Test?'
+                          }
+                      }
+                      openshift.withCluster() {
+                          openshift.withProject() {
+                              sh "echo Tagging image for TEST"
+                              sh 'oc tag ${APP_NAME}:latest ${APP_NAME}:test'
+                          }
+                      }
+                  }
+                  
+                  stage("Deploy to TEST") {
+                      openshift.withCluster() {
+                          openshift.withProject() {
+                              sh 'echo Wait for Demo app to rollout completely.'
+                              sh 'oc rollout status -n ${TEST_NAMESPACE} dc/${APP_NAME} --watch'
+                          }
+                      }
+                  }
+                  
+                   Tag Image for Prod
+                  stage('Promote to PROD') {
+                      timeout(time: 10, unit: 'MINUTES') {
+                          script {
+                              input message: 'Promote application to Prod?'
+                          }
+                      }
+                      openshift.withCluster() {
+                          openshift.withProject() {
+                              sh "echo Tagging image for PROD"
+                              sh 'oc tag ${APP_NAME}:latest ${APP_NAME}:prod'
+                          }
+                      }
+                  }
+                  
+                  stage("Deploy to PROD") {
+                      openshift.withCluster() {
+                          openshift.withProject() {
+                              sh 'echo Wait for Demo app to rollout completely.'
+                              sh 'oc rollout status -n ${PROD_NAMESPACE} dc/${APP_NAME} --watch'
+                          }
+                      }
+                  }
+
+              }
+
+          } catch (err) {
+              echo "in catch block"
+              currentBuild.result = 'FAILURE'
+              env.ERR = "${err}"
+              node {
+                  sh "curl -XPOST '${LIFECYCLE_WEBHOOK}' -H 'Content-type: application/json' --data '{\"username\":\"The Pipe Lion\",\"icon_emoji\":\":lion_face:\",\"text\": \"${APP_NAME} Pipeline Failure - ${ERR}\"}'"
+              }
+              echo "Caught: ${err}"
+              throw err
+          }
+
+
+
+          /** @return The tag name, or `null` if the current commit isn't a tag.
+          */
+
+          String gitTagName() {
+              commit = getCommit()
+              if (commit) {
+                  desc = sh(script: "git describe --tags ${commit}", returnStdout: true)?.trim()
+                  if (isTag(desc)) {
+                      return desc
+                  }
+              }
+              return null
+          }
+
+
+          String getCommit() {
+              return sh(script: 'git rev-parse HEAD', returnStdout: true)?.trim()
+          }
+
+
+          @NonCPS
+
+          boolean isTag(String desc) {
+              match = desc =~ /.+-[0-9]+-g[0-9A-Fa-f]{6,}$/
+              result = !match
+              match = null // prevent serialisation
+              return result
+          }
+      type: JenkinsPipeline
+    successfulBuildsHistoryLimit: 5
+    triggers:
+      - type: ConfigChange
+      - github:
+          secret: '${GITHUB_WEBHOOK_SECRET}'
+        type: GitHub
+parameters:
+- displayName: Openshift Namespace License Plate (ex// pjztlm)
+  name: LICENSE_PLATE
+  required: true
+- displayName: Openshift Service Name (ex// efiling-api)
+  name: APP_NAME
+  required: true
+- displayName: Github URL (ex// https://github.com/bcgov/jag-file-submission)
+  name: GIT_URL
+  required: true
