@@ -1,0 +1,10 @@
+apiVersion: security.devops.gov.bc.ca/v1alpha1
+kind: NetworkSecurityPolicy
+metadata:
+  name: egress-internet
+spec:
+  description: allow 735b8b-tools namespace to talk to the internet.
+  destination:
+    - - 'ext:network=any'
+  source:
+    - - $namespace=735b8b-tools
